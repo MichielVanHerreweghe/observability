@@ -10,16 +10,19 @@ public sealed class StoreController : ControllerBase
 {
     private readonly BusinessMetrics _businessMetrics;
     private readonly Random _random = new();
+    private readonly ILogger<StoreController> _logger;
 
-    public StoreController(BusinessMetrics businessMetrics)
+    public StoreController(BusinessMetrics businessMetrics, ILogger<StoreController> logger)
     {
         _businessMetrics = businessMetrics;
+        _logger = logger;
     }
 
     [HttpGet("join")]
     public IActionResult Join()
     {
         _businessMetrics.UserJoined();
+        _logger.LogInformation("User joined the store.");
         return Ok("User joined the store.");
     }
 
@@ -27,6 +30,7 @@ public sealed class StoreController : ControllerBase
     public IActionResult LookAround()
     {
         _businessMetrics.UserLookingAround();
+        _logger.LogInformation("User is looking around.");
         return Ok("User is looking around.");
     }
 
@@ -34,6 +38,7 @@ public sealed class StoreController : ControllerBase
     public IActionResult Leave()
     {
         _businessMetrics.UserLeft();
+        _logger.LogInformation("User left the store.");
         return Ok("User left the store.");
     }
 
@@ -41,6 +46,7 @@ public sealed class StoreController : ControllerBase
     public IActionResult Served()
     {
         _businessMetrics.UserServed();
+        _logger.LogInformation("User has been served.");
         return Ok("User has been served.");
     }
 
@@ -67,5 +73,12 @@ public sealed class StoreController : ControllerBase
         }
 
         return Ok(new { Action = action, Message = $"Simulated {action}" });
+    }
+
+    [HttpGet("error")]
+    public IActionResult Error()
+    {
+        _logger.LogError("User encountered an error.");
+        return Ok("User encountered an error.");
     }
 }

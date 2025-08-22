@@ -1,4 +1,5 @@
 ﻿using Observability.Api.Meters;
+using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using System.Diagnostics.Metrics;
 
@@ -29,8 +30,25 @@ public static class IServiceCollectionExtensions
             metrics.AddAspNetCoreInstrumentation();
             metrics.AddMeter("Store.Api");
             metrics.AddOtlpExporter(exporter =>
-                exporter.Endpoint = new Uri(otlpEndpoint)
-            );
+            {
+                exporter.Endpoint = new Uri(otlpEndpoint);
+                exporter.ExportProcessorType = OpenTelemetry.ExportProcessorType.Batch;
+                exporter.BatchExportProcessorOptions = new OpenTelemetry.BatchExportProcessorOptions<System.Diagnostics.Activity>
+                {
+                    MaxExportBatchSize = 512,
+                    ScheduledDelayMilliseconds = 1000,
+                    ExporterTimeoutMilliseconds = 30000,
+                    MaxQueueSize = 2048
+                };
+            });
+        })
+        .WithLogging(logs =>
+        {
+            logs.AddOtlpExporter(exporter =>
+            {
+                exporter.Endpoint = new Uri(otlpEndpoint);
+                exporter.ExportProcessorType = OpenTelemetry.ExportProcessorType.Batch;
+            });
         });
 
         services.AddSingleton(new Meter("Store.Api", "1.0.0"));

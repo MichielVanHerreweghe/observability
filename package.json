@@ -1,0 +1,19 @@
+{
+    "name": "observability-load-tests",
+    "version": "1.0.0",
+    "description": "K6 load tests for observability API",
+    "scripts": {
+        "test": "k6 run load-test.js",
+        "test:simple": "k6 run simple-load-test.js",
+        "test:high-load": "k6 run load-test.js --vus 100 --duration 5m",
+        "test:stress": "k6 run load-test.js --stage 30s:50,1m:100,30s:200,2m:200,1m:0"
+    },
+    "keywords": [
+        "k6",
+        "load-testing",
+        "observability",
+        "performance"
+    ],
+    "author": "",
+    "license": "MIT"
+}

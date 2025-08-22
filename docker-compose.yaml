@@ -7,7 +7,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "5000:8080"
+      - "5050:8080"
     environment:
       ConnectionStrings__OTLP_ENDPOINT: "http://alloy:4317"
     depends_on:
@@ -19,12 +19,12 @@ services:
   alloy:
     image: grafana/alloy:latest
     ports:
-      - "4317:4317"   # OTLP gRPC
-      - "4318:4318"   # OTLP HTTP
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
       - "12345:12345" # Alloy UI
     volumes:
       - ./configs/alloy.hcl:/etc/alloy/config.alloy
-    command: ["run", "/etc/alloy/config.alloy"]
+    command: [ "run", "/etc/alloy/config.alloy" ]
 
   # -------------------------
   # Prometheus
@@ -42,8 +42,23 @@ services:
       - '--web.console.templates=/etc/prometheus/consoles'
       - '--web.enable-lifecycle'
       - '--web.enable-remote-write-receiver'
+      - '--storage.tsdb.retention.time=30d'
+      - '--storage.tsdb.wal-compression'
+      - '--storage.remote.flush-deadline=2m'
+      - '--storage.remote.read-concurrent-limit=20'
     depends_on:
       - alloy
+
+  # -------------------------
+  # Loki
+  # -------------------------
+  loki:
+    image: grafana/loki:latest
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./configs/loki.yaml:/etc/loki/local-config.yaml
+    command: -config.file=/etc/loki/local-config.yaml
 
   # -------------------------
   # Grafana
@@ -54,5 +69,13 @@ services:
       - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-storage:/var/lib/grafana
+      - ./configs/grafana/provisioning:/etc/grafana/provisioning
+      - ./configs/grafana/dashboards:/var/lib/grafana/dashboards
     depends_on:
       - prometheus
+      - loki
+
+volumes:
+  grafana-storage:
