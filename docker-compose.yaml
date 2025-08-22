@@ -1,0 +1,58 @@
+services:
+  # -------------------------
+  # .NET App
+  # -------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5000:8080"
+    environment:
+      ConnectionStrings__OTLP_ENDPOINT: "http://alloy:4317"
+    depends_on:
+      - alloy
+
+  # -------------------------
+  # Grafana Alloy (OTEL Collector)
+  # -------------------------
+  alloy:
+    image: grafana/alloy:latest
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "12345:12345" # Alloy UI
+    volumes:
+      - ./configs/alloy.hcl:/etc/alloy/config.alloy
+    command: ["run", "/etc/alloy/config.alloy"]
+
+  # -------------------------
+  # Prometheus
+  # -------------------------
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./configs/prometheus.yaml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--web.enable-remote-write-receiver'
+    depends_on:
+      - alloy
+
+  # -------------------------
+  # Grafana
+  # -------------------------
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
