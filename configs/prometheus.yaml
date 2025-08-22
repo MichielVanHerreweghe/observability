@@ -10,7 +10,7 @@ remote_write:
       max_shards: 50
       min_shards: 1
       max_samples_per_send: 5000
-      batch_send_deadline: 5s
+      batch_send_deadline: 2s
 
 scrape_configs:
   - job_name: 'prometheus'

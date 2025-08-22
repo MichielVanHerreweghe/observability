@@ -44,7 +44,7 @@ services:
       - '--web.enable-remote-write-receiver'
       - '--storage.tsdb.retention.time=30d'
       - '--storage.tsdb.wal-compression'
-      - '--storage.remote.flush-deadline=2m'
+      - '--storage.remote.flush-deadline=10s'
       - '--storage.remote.read-concurrent-limit=20'
     depends_on:
       - alloy

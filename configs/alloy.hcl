@@ -27,6 +27,19 @@ otelcol.exporter.loki "loki" {
 prometheus.remote_write "default" {
   endpoint {
     url = "http://prometheus:9090/api/v1/write"
+    
+    // Optimize for faster delivery
+    remote_timeout = "10s"
+    
+    queue_config {
+      capacity = 10000
+      max_shards = 50
+      min_shards = 1
+      max_samples_per_send = 2000
+      batch_send_deadline = "2s"
+      min_backoff = "30ms"
+      max_backoff = "100ms"
+    }
   }
 }
 

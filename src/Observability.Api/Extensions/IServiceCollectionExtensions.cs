@@ -36,7 +36,7 @@ public static class IServiceCollectionExtensions
                 exporter.BatchExportProcessorOptions = new OpenTelemetry.BatchExportProcessorOptions<System.Diagnostics.Activity>
                 {
                     MaxExportBatchSize = 512,
-                    ScheduledDelayMilliseconds = 1000,
+                    ScheduledDelayMilliseconds = 500, // Reduced from 1000ms to 500ms
                     ExporterTimeoutMilliseconds = 30000,
                     MaxQueueSize = 2048
                 };
