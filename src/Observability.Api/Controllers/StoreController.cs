@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Observability.Api.Meters;
-using OpenTelemetry.Metrics;
+using Observability.Api.Services;
+using System.Diagnostics;
 
 namespace Observability.Api.Controllers;
 
@@ -9,76 +10,157 @@ namespace Observability.Api.Controllers;
 public sealed class StoreController : ControllerBase
 {
     private readonly BusinessMetrics _businessMetrics;
+    private readonly RedisMetricsService _metricsService;
     private readonly Random _random = new();
     private readonly ILogger<StoreController> _logger;
 
-    public StoreController(BusinessMetrics businessMetrics, ILogger<StoreController> logger)
+    public StoreController(BusinessMetrics businessMetrics, RedisMetricsService metricsService, ILogger<StoreController> logger)
     {
         _businessMetrics = businessMetrics;
+        _metricsService = metricsService;
         _logger = logger;
     }
 
     [HttpGet("join")]
-    public IActionResult Join()
+    public async Task<IActionResult> Join()
     {
-        _businessMetrics.UserJoined();
-        _logger.LogInformation("User joined the store.");
-        return Ok("User joined the store.");
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            await Task.Delay(_random.Next(50, 200)); // Simulate processing time
+            _businessMetrics.UserJoined();
+            _logger.LogInformation("User joined the store.");
+
+            return Ok("User joined the store.");
+        }
+        finally
+        {
+            stopwatch.Stop();
+            _metricsService.RecordHistogram("api_request_duration_ms", stopwatch.ElapsedMilliseconds,
+                new Dictionary<string, string> { { "endpoint", "join" }, { "method", "GET" } });
+        }
     }
 
     [HttpGet("look-around")]
-    public IActionResult LookAround()
+    public async Task<IActionResult> LookAround()
     {
-        _businessMetrics.UserLookingAround();
-        _logger.LogInformation("User is looking around.");
-        return Ok("User is looking around.");
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            await Task.Delay(_random.Next(100, 300)); // Simulate processing time
+            _businessMetrics.UserLookingAround();
+            _logger.LogInformation("User is looking around.");
+
+            return Ok("User is looking around.");
+        }
+        finally
+        {
+            stopwatch.Stop();
+            _metricsService.RecordHistogram("api_request_duration_ms", stopwatch.ElapsedMilliseconds,
+                new Dictionary<string, string> { { "endpoint", "look-around" }, { "method", "GET" } });
+        }
     }
 
     [HttpGet("leave")]
-    public IActionResult Leave()
+    public async Task<IActionResult> Leave()
     {
-        _businessMetrics.UserLeft();
-        _logger.LogInformation("User left the store.");
-        return Ok("User left the store.");
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            await Task.Delay(_random.Next(25, 100)); // Simulate processing time
+            _businessMetrics.UserLeft();
+            _logger.LogInformation("User left the store.");
+
+            return Ok("User left the store.");
+        }
+        finally
+        {
+            stopwatch.Stop();
+            _metricsService.RecordHistogram("api_request_duration_ms", stopwatch.ElapsedMilliseconds,
+                new Dictionary<string, string> { { "endpoint", "leave" }, { "method", "GET" } });
+        }
     }
 
     [HttpGet("served")]
-    public IActionResult Served()
+    public async Task<IActionResult> Served()
     {
-        _businessMetrics.UserServed();
-        _logger.LogInformation("User has been served.");
-        return Ok("User has been served.");
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            await Task.Delay(_random.Next(200, 500)); // Simulate processing time
+            _businessMetrics.UserServed();
+            _logger.LogInformation("User has been served.");
+
+            return Ok("User has been served.");
+        }
+        finally
+        {
+            stopwatch.Stop();
+            _metricsService.RecordHistogram("api_request_duration_ms", stopwatch.ElapsedMilliseconds,
+                new Dictionary<string, string> { { "endpoint", "served" }, { "method", "GET" } });
+        }
     }
 
     [HttpPost("simulate")]
-    public IActionResult SimulateUserAction()
+    public async Task<IActionResult> SimulateUserAction()
     {
-        var actions = new List<string> { "join", "look", "leave", "serve" };
-        var action = actions[_random.Next(actions.Count)];
+        var stopwatch = Stopwatch.StartNew();
 
-        switch (action)
+        try
         {
-            case "join":
-                _businessMetrics.UserJoined();
-                break;
-            case "look":
-                _businessMetrics.UserLookingAround();
-                break;
-            case "leave":
-                _businessMetrics.UserLeft();
-                break;
-            case "serve":
-                _businessMetrics.UserServed();
-                break;
-        }
+            var actions = new List<string> { "join", "look", "leave", "serve" };
+            var action = actions[_random.Next(actions.Count)];
 
-        return Ok(new { Action = action, Message = $"Simulated {action}" });
+            await Task.Delay(_random.Next(50, 200)); // Simulate processing time
+
+            switch (action)
+            {
+                case "join":
+                    _businessMetrics.UserJoined();
+                    break;
+                case "look":
+                    _businessMetrics.UserLookingAround();
+                    break;
+                case "leave":
+                    _businessMetrics.UserLeft();
+                    break;
+                case "serve":
+                    _businessMetrics.UserServed();
+                    break;
+            }
+
+            return Ok(new { Action = action, Message = $"Simulated {action}" });
+        }
+        finally
+        {
+            stopwatch.Stop();
+            _metricsService.RecordHistogram("api_request_duration_ms", stopwatch.ElapsedMilliseconds,
+                new Dictionary<string, string> { { "endpoint", "simulate" }, { "method", "POST" } });
+        }
     }
 
     [HttpGet("error")]
-    public IActionResult Error()
+    public async Task<IActionResult> Error()
     {
-        _logger.LogError("User encountered an error.");
-        return Ok("User encountered an error.");
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            await Task.Delay(_random.Next(100, 300)); // Simulate processing time
+            _metricsService.IncrementCounter("api_errors", 1, new Dictionary<string, string> { { "endpoint", "error" } });
+            _logger.LogError("User encountered an error.");
+
+            return StatusCode(500, "User encountered an error.");
+        }
+        finally
+        {
+            stopwatch.Stop();
+            _metricsService.RecordHistogram("api_request_duration_ms", stopwatch.ElapsedMilliseconds,
+                new Dictionary<string, string> { { "endpoint", "error" }, { "method", "GET" } });
+        }
     }
 }

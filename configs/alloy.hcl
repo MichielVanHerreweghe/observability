@@ -11,13 +11,23 @@ otelcol.receiver.otlp "otlp" {
   }
 
   output {
-    metrics = [otelcol.exporter.prometheus.prometheus.input]
-    logs    = [otelcol.exporter.loki.loki.input]
+    logs = [otelcol.exporter.loki.loki.input]
   }
 }
 
-otelcol.exporter.prometheus "prometheus" {
-  forward_to = [prometheus.remote_write.default.receiver]
+// Scrape Redis metrics from the Redis exporter sidecar
+prometheus.scrape "app_metrics" {
+  targets = [
+    {
+      __address__ = "app:8080",
+      job         = "observability-api",
+    },
+  ]
+
+  forward_to      = [prometheus.remote_write.default.receiver]
+  scrape_interval = "5s"
+  scrape_timeout  = "3s"
+  metrics_path    = "/metrics"
 }
 
 otelcol.exporter.loki "loki" {

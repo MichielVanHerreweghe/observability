@@ -10,8 +10,51 @@ services:
       - "5050:8080"
     environment:
       ConnectionStrings__OTLP_ENDPOINT: "http://alloy:4317"
+      ConnectionStrings__Redis: "redis:6379"
     depends_on:
-      - alloy
+      alloy:
+        condition: service_started
+      redis:
+        condition: service_healthy
+
+  # -------------------------
+  # Redis Cache for Metrics
+  # -------------------------
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # -------------------------
+  # Redis Exporter with Custom Lua Script
+  # -------------------------
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    ports:
+      - "9121:9121"
+    environment:
+      REDIS_ADDR: "redis:6379"
+    volumes:
+      - ./configs/redis-exporter.lua:/app/redis-exporter.lua:ro
+    command: |
+      sh -c "
+        redis_exporter \
+          -redis.addr=redis:6379 \
+          -web.listen-address=:9121 \
+          -web.telemetry-path=/metrics \
+          -script=/app/redis-exporter.lua \
+          -log-format=txt
+      "
+    depends_on:
+      - redis
 
   # -------------------------
   # Grafana Alloy (OTEL Collector)
@@ -79,3 +122,4 @@ services:
 
 volumes:
   grafana-storage:
+  redis-data:
