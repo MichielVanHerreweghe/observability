@@ -1,7 +1,7 @@
 ﻿using Observability.Api.Meters;
-using Observability.Api.Services;
 using OpenTelemetry.Logs;
-using StackExchange.Redis;
+using OpenTelemetry.Metrics;
+using System.Diagnostics.Metrics;
 
 namespace Observability.Api.Extensions;
 
@@ -12,63 +12,47 @@ public static class IServiceCollectionExtensions
         services.AddControllers();
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen();
-        services.AddRedisServices(configuration);
-        services.AddLoggingServices(configuration);
+        services.AddOpenTelemetryServices(configuration);
 
         return services;
     }
 
-    private static IServiceCollection AddRedisServices(this IServiceCollection services, IConfiguration configuration)
-    {
-        // Add Redis connection
-        var redisConnectionString = configuration.GetConnectionString("Redis") ?? "localhost:6379";
-        services.AddSingleton<IConnectionMultiplexer>(provider =>
-        {
-            var logger = provider.GetRequiredService<ILogger<IConnectionMultiplexer>>();
-            logger.LogInformation("Connecting to Redis at: {ConnectionString}", redisConnectionString);
-
-            try
-            {
-                // Add connection resilience
-                var config = ConfigurationOptions.Parse(redisConnectionString);
-                config.AbortOnConnectFail = false; // Keep trying to connect
-                config.ConnectTimeout = 10000; // 10 seconds timeout
-                config.SyncTimeout = 5000; // 5 seconds sync timeout
-                config.ConnectRetry = 3; // Retry 3 times
-
-                var connection = ConnectionMultiplexer.Connect(config);
-                logger.LogInformation("Redis connection established: {IsConnected}", connection.IsConnected);
-                return connection;
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Failed to connect to Redis");
-                throw;
-            }
-        });
-
-        // Add Redis metrics service
-        services.AddSingleton<RedisMetricsService>();
-        services.AddSingleton<BusinessMetrics>();
-
-        return services;
-    }
-    private static IServiceCollection AddLoggingServices(this IServiceCollection services, IConfiguration configuration)
+    private static IServiceCollection AddOpenTelemetryServices(this IServiceCollection services, IConfiguration configuration)
     {
         string? otlpEndpoint = configuration.GetConnectionString("OTLP_ENDPOINT");
 
-        if (!string.IsNullOrEmpty(otlpEndpoint))
+        if (string.IsNullOrEmpty(otlpEndpoint))
+            throw new ArgumentException("OTLP endpoint is not configured in the connection strings.");
+
+        services.AddOpenTelemetry()
+        .WithMetrics(metrics =>
         {
-            services.AddOpenTelemetry()
-            .WithLogging(logs =>
+            metrics.AddAspNetCoreInstrumentation();
+            metrics.AddMeter("Store.Api");
+            metrics.AddOtlpExporter(exporter =>
             {
-                logs.AddOtlpExporter(exporter =>
+                exporter.Endpoint = new Uri(otlpEndpoint);
+                exporter.ExportProcessorType = OpenTelemetry.ExportProcessorType.Batch;
+                exporter.BatchExportProcessorOptions = new OpenTelemetry.BatchExportProcessorOptions<System.Diagnostics.Activity>
                 {
-                    exporter.Endpoint = new Uri(otlpEndpoint);
-                    exporter.ExportProcessorType = OpenTelemetry.ExportProcessorType.Batch;
-                });
+                    MaxExportBatchSize = 512,
+                    ScheduledDelayMilliseconds = 500, // Reduced from 1000ms to 500ms
+                    ExporterTimeoutMilliseconds = 30000,
+                    MaxQueueSize = 2048
+                };
             });
-        }
+        })
+        .WithLogging(logs =>
+        {
+            logs.AddOtlpExporter(exporter =>
+            {
+                exporter.Endpoint = new Uri(otlpEndpoint);
+                exporter.ExportProcessorType = OpenTelemetry.ExportProcessorType.Batch;
+            });
+        });
+
+        services.AddSingleton(new Meter("Store.Api", "1.0.0"));
+        services.AddSingleton<BusinessMetrics>();
 
         return services;
     }
